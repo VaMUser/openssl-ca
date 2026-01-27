@@ -84,7 +84,7 @@ countryName_default           = XX
 
 commonName                    = Common Name (hostname, IP, or your name)
 commonName_max                = 64
-# default intentionally NOT set — CN must be explicit per cert
+# default intentionally NOT set, CN must be explicit per cert
 
 # --- Optional / informational fields ---
 emailAddress                  = Email Address
@@ -93,7 +93,6 @@ emailAddress_default          = pki@example.local
 [ req_ext ]
 basicConstraints     = CA:FALSE
 subjectKeyIdentifier = hash
-subjectAltName       = ${ENV::SAN}
 
 [ server_cert ]
 basicConstraints        = critical,CA:FALSE
