@@ -1,0 +1,133 @@
+# OpenSSL CA configuration (single-tier)
+# Focus: manual issuance for TLS server certificates and mTLS client certificates.
+# - Keeps CA key passphrase (prompted interactively by OpenSSL).
+# - Separates server/client issuance profiles.
+# - Supports SAN via ENV::SAN in CSR; SAN is copied from CSR into issued cert.
+
+HOME = .
+
+[ script_defaults ]
+# Script-level defaults (edit as needed)
+dns_suffix = local
+
+[ aia ]
+# Authority Information Access (edit as needed)
+caIssuers;URI.0 = http://pki-main.local/ca.crt
+caIssuers;URI.1 = http://pki-reserve.local/ca.crt
+#OCSP;URI.0 = http://pki.local/ocsp
+
+[ crl_dp ]
+fullName = @crl_uris
+
+[ crl_uris ]
+URI.0 = http://pki-main.local/crl/crl.pem
+URI.1 = http://pki-reserve.local/crl/crl.pem
+
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir              = .
+serial           = $dir/serial
+database         = $dir/index.txt
+new_certs_dir    = $dir/newcerts
+
+certificate      = $dir/CA/ca.crt
+private_key      = $dir/CA/private/ca.key
+
+default_days     = 730
+default_md       = sha512
+
+preserve         = no
+email_in_dn      = no
+nameopt          = default_ca
+certopt          = default_ca
+policy           = policy_loose
+
+# CRL
+crlnumber        = $dir/crlnumber
+crl              = $dir/crl/crl.pem
+default_crl_days = 30
+crl_extensions   = crl_ext
+
+RANDFILE         = $dir/CA/private/.rand
+
+# Copy requested extensions from CSR into the issued certificate (SAN)
+copy_extensions  = copy
+
+[ req ]
+default_bits        = 3072
+default_md          = sha256
+string_mask         = utf8only
+distinguished_name  = req_distinguished_name
+req_extensions      = req_ext
+prompt              = yes
+
+[ req_distinguished_name ]
+# --- Required / commonly used DN fields ---
+0.organizationName            = Organization Name (company)
+0.organizationName_default    = Example Org
+
+organizationalUnitName        = Organizational Unit Name (department, division)
+organizationalUnitName_default= IT
+
+localityName                  = Locality Name (city, district)
+localityName_default          = City
+
+stateOrProvinceName           = State or Province Name (full name)
+stateOrProvinceName_default   = State
+
+countryName                   = Country Name (2 letter code)
+countryName_min               = 2
+countryName_max               = 2
+countryName_default           = XX
+
+commonName                    = Common Name (hostname, IP, or your name)
+commonName_max                = 64
+# default intentionally NOT set — CN must be explicit per cert
+
+# --- Optional / informational fields ---
+emailAddress                  = Email Address
+emailAddress_default          = pki@example.local
+
+[ req_ext ]
+basicConstraints     = CA:FALSE
+subjectKeyIdentifier = hash
+subjectAltName       = ${ENV::SAN}
+
+[ server_cert ]
+basicConstraints        = critical,CA:FALSE
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid,issuer
+keyUsage                = critical,digitalSignature,keyEncipherment
+extendedKeyUsage        = serverAuth
+authorityInfoAccess       = @aia
+crlDistributionPoints     = @crl_dp
+
+[ client_cert ]
+basicConstraints        = critical,CA:FALSE
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid,issuer
+keyUsage                = critical,digitalSignature
+extendedKeyUsage        = clientAuth
+authorityInfoAccess       = @aia
+crlDistributionPoints     = @crl_dp
+
+[ v3_ca ]
+basicConstraints       = critical,CA:TRUE
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+keyUsage               = critical,keyCertSign,cRLSign
+
+[ policy_loose ]
+countryName            = optional
+stateOrProvinceName    = optional
+localityName           = optional
+organizationName       = optional
+organizationalUnitName = optional
+commonName             = supplied
+emailAddress           = optional
+
+[ crl_ext ]
+authorityKeyIdentifier = keyid:always,issuer:always
+
