@@ -125,3 +125,8 @@ NOTIFY_CONFIG=/etc/openssl-ca/notify.config ./expire-soon.sh 30 --notify
 
 ### Обслуживание
 - `clean.sh` — удаляет сгенерированные файлы (не удаляет ключ/сертификат CA)
+
+## Примечания
+- `create_*_csr.sh` автоматически формирует Subject из DN-defaults в `openssl.cnf` и задаёт `CN` равным переданному `<name>` (ввод CN не запрашивается интерактивно).
+
+- CDP поддерживает несколько CRL URL через `[ crl_dp ]` + `[ crl_uris ]` (`URI.0`, `URI.1`, ...).

@@ -1,5 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+get_default() {
+  # Reads *_default values from openssl.cnf (simple parser)
+  # Usage: get_default "countryName_default"
+  local key="$1"
+  awk -F '=' -v k="$key" '
+    $1 ~ "^[[:space:]]*"k"[[:space:]]*$" {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2);
+      print $2; exit
+    }' openssl.cnf
+}
+
+build_subj() {
+  local cn="$1"
+  local C ST L O OU EMAIL
+  C="$(get_default countryName_default || true)"
+  ST="$(get_default stateOrProvinceName_default || true)"
+  L="$(get_default localityName_default || true)"
+  # organizationName_default may be written as 0.organizationName_default
+  O="$(get_default 0.organizationName_default || true)"
+  [ -z "$O" ] && O="$(get_default organizationName_default || true)"
+  OU="$(get_default organizationalUnitName_default || true)"
+  EMAIL="$(get_default emailAddress_default || true)"
+
+  local subj=""
+  [ -n "$C" ] && subj="${subj}/C=${C}"
+  [ -n "$ST" ] && subj="${subj}/ST=${ST}"
+  [ -n "$L" ] && subj="${subj}/L=${L}"
+  [ -n "$O" ] && subj="${subj}/O=${O}"
+  [ -n "$OU" ] && subj="${subj}/OU=${OU}"
+  subj="${subj}/CN=${cn}"
+  [ -n "$EMAIL" ] && subj="${subj}/emailAddress=${EMAIL}"
+  echo "$subj"
+}
+
+set -euo pipefail
 umask 077
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -54,17 +90,21 @@ else
 fi
 
 if [[ "$KEYOPT" == "-aes256" ]]; then
-  SAN="$SAN" openssl req \
+  openssl req \
     -config ./openssl.cnf \
     -new \
+  -subj "$(build_subj "$NAME")" \
+  -addext "subjectAltName=${SAN}" \
     -newkey rsa:3072 -aes256 -passout pass:"$PASS" \
     -keyout "$KEY" \
     -out "$CSR" \
     -reqexts req_ext
 else
-  SAN="$SAN" openssl req \
+  openssl req \
     -config ./openssl.cnf \
     -new \
+  -subj "$(build_subj "$NAME")" \
+  -addext "subjectAltName=${SAN}" \
     -newkey rsa:3072 -nodes \
     -keyout "$KEY" \
     -out "$CSR" \
