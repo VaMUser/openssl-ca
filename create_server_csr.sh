@@ -34,7 +34,6 @@ build_subj() {
   echo "$subj"
 }
 
-set -euo pipefail
 umask 077
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -84,7 +83,7 @@ fi
 openssl req \
   -config ./openssl.cnf \
   -new \
-  -subj "$(build_subj "$NAME")" \
+  -subj "$(build_subj "$APP_NAME")" \
   -addext "subjectAltName=${SAN}" \
   -newkey rsa:3072 $KEYOPT \
   -keyout "$KEY" \

@@ -35,7 +35,6 @@ build_subj() {
   echo "$subj"
 }
 
-set -euo pipefail
 umask 077
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -93,7 +92,7 @@ if [[ "$KEYOPT" == "-aes256" ]]; then
   openssl req \
     -config ./openssl.cnf \
     -new \
-  -subj "$(build_subj "$NAME")" \
+  -subj "$(build_subj "$APP_NAME")" \
   -addext "subjectAltName=${SAN}" \
     -newkey rsa:3072 -aes256 -passout pass:"$PASS" \
     -keyout "$KEY" \
@@ -103,7 +102,7 @@ else
   openssl req \
     -config ./openssl.cnf \
     -new \
-  -subj "$(build_subj "$NAME")" \
+  -subj "$(build_subj "$APP_NAME")" \
   -addext "subjectAltName=${SAN}" \
     -newkey rsa:3072 -nodes \
     -keyout "$KEY" \
