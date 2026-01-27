@@ -18,9 +18,6 @@ caIssuers;URI.1 = http://pki-reserve.local/ca.crt
 
 [ crl_dp ]
 # CRL Distribution Points (edit as needed)
-fullname = @crl_uris
-
-[ crl_uris ]
 URI.0 = http://pki-main.local/crl/crl.pem
 URI.1 = http://pki-reserve.local/crl/crl.pem
 
