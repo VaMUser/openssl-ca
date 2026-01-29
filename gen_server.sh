@@ -7,17 +7,10 @@ cd "$DIR"
 source ./lib.sh
 
 # Generate and sign a TLS server certificate (CSR + CRT).
-# Usage: gen_server.sh <APP_NAME> [-san "DNS.1:app.local,IP.1:10.0.0.1"]
-#
-# Notes:
-# - CA key passphrase will be requested by OpenSSL during signing.
-# - If -san is omitted, defaults to DNS:<APP_NAME>.<dns_suffix>.
 
 [[ $# -ge 1 ]] || die "Usage: gen_server.sh <APP_NAME> [-san \"DNS.1:app.local,IP.1:10.0.0.1\"]"
-
 APP_NAME="$1"; shift
 validate_name "$APP_NAME"
 
-# Pass-through args to CSR generator (e.g., -san ...)
 ./create_server_csr.sh "$APP_NAME" "$@"
 ./sign_server_csr.sh "$APP_NAME"

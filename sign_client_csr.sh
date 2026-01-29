@@ -7,11 +7,12 @@ cd "$DIR"
 source ./lib.sh
 
 # Sign an existing CSR as a TLS client certificate.
-# Prompts for CA key passphrase.
 
 [[ $# -eq 1 ]] || die "Usage: sign_client_csr.sh <APP_NAME>"
 APP_NAME="$1"
 validate_name "$APP_NAME"
+
+ensure_layout
 
 CSR="./out/${APP_NAME}.csr"
 CRT="./out/${APP_NAME}.crt"

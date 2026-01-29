@@ -1,5 +1,4 @@
-# CA script configuration
-# Copy to ca.config and set values (keep permissions 0600).
+# Notification configuration (keep permissions 0600 if you create notify.config)
 # TELEGRAM_BOT_TOKEN="123:ABCDEF..."
 # TELEGRAM_CHAT_ID="-1001234567890"
 # TELEGRAM_API_URL="https://api.telegram.org"

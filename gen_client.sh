@@ -7,22 +7,21 @@ cd "$DIR"
 source ./lib.sh
 
 # Generate and sign a mTLS client certificate (CSR + CRT) and export to PFX.
-# Usage: gen_client.sh <NAME> [-san "DNS.1:alice.local,email.1:alice@example.com"]
+
+# Usage: gen_client.sh <NAME> [-san "..."]
 #
 # Output:
-#   ./out/<NAME>.key   (encrypted by default; set ENCRYPT_KEY=0 to disable)
+#   ./out/<NAME>.key
 #   ./out/<NAME>.crt
-#   ./out/<NAME>.pfx   (contains client cert + unencrypted private key + CA cert; protected by PFX password)
-#
-# The PFX password is set to the same value as the private-key passphrase (you enter it once).
+#   ./out/<NAME>.pfx   (contains client cert + private key + CA cert; protected by PFX password)
 
 [[ $# -ge 1 ]] || die "Usage: gen_client.sh <NAME> [-san \"DNS.1:alice.local\"]"
-
 APP_NAME="$1"; shift
 validate_name "$APP_NAME"
 
-# Ask once for passphrase (only if key is encrypted)
 PASS=""
+
+# Ask once for passphrase (only if key is encrypted)
 if [[ "${ENCRYPT_KEY:-1}" != "0" ]]; then
   read -r -s -p "Enter passphrase for client private key / PFX: " PASS; echo
   [[ -n "$PASS" ]] || die "Empty passphrase is not allowed for encrypted key. Set ENCRYPT_KEY=0 if you need an unencrypted key."
@@ -46,13 +45,20 @@ if [[ -f "$PFX" ]]; then
   rm -f "$PFX"
 fi
 
-# Export PKCS#12:
-# - PFX password equals PASS (or empty if ENCRYPT_KEY=0 and PASS left empty)
-# - Private key inside PFX is not separately passworded; it is protected by the PFX password.
 if [[ "${ENCRYPT_KEY:-1}" != "0" ]]; then
-  openssl pkcs12 -export     -inkey "$KEY" -passin pass:"$PASS"     -in "$CRT"     -certfile "$CA_CRT"     -out "$PFX"     -passout pass:"$PASS"
+  openssl pkcs12 -export \
+    -inkey "$KEY" -passin pass:"$PASS" \
+    -in "$CRT" \
+    -certfile "$CA_CRT" \
+    -out "$PFX" \
+    -passout pass:"$PASS"
 else
-  openssl pkcs12 -export     -inkey "$KEY"     -in "$CRT"     -certfile "$CA_CRT"     -out "$PFX"     -passout pass:
+  openssl pkcs12 -export \
+    -inkey "$KEY" \
+    -in "$CRT" \
+    -certfile "$CA_CRT" \
+    -out "$PFX" \
+    -passout pass:
 fi
 
 chmod 0600 "$PFX"

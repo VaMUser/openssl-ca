@@ -11,16 +11,14 @@ dns_suffix = local
 
 [ aia ]
 # Authority Information Access (edit as needed)
-caIssuers;URI.0 = http://pki-main.local/ca.crt
+caIssuers;URI.0 = http://pki.local/ca.crt
 caIssuers;URI.1 = http://pki-reserve.local/ca.crt
-
 #OCSP;URI.0 = http://pki.local/ocsp
 
 [ crl_dp ]
 # CRL Distribution Points (edit as needed)
 URI.0 = http://pki-main.local/crl/crl.pem
 URI.1 = http://pki-reserve.local/crl/crl.pem
-
 [ ca ]
 default_ca = CA_default
 
@@ -110,6 +108,7 @@ keyUsage               = critical,keyCertSign,cRLSign
 [ policy_loose ]
 countryName            = optional
 stateOrProvinceName    = optional
+localityName           = optional
 organizationName       = optional
 organizationalUnitName = optional
 commonName             = supplied

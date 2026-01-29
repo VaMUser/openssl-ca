@@ -1,6 +1,6 @@
 # OpenSSL CA scripts (одноуровневый CA)
 
-Этот репозиторий — небольшой и поддерживаемый набор скриптов вокруг `openssl ca` для **одноуровневого** УЦ:
+Небольшой и поддерживаемый набор скриптов вокруг `openssl ca` для **одноуровневого** УЦ:
 - Сертификаты серверов (TLS)
 - Клиентские сертификаты (mTLS)
 - Отзыв + CRL
@@ -10,37 +10,44 @@
 ## Структура
 
 - `openssl.cnf` — конфигурация CA (extensions, policy, AIA/CDP, defaults)
-- `private/` — приватный ключ CA (права 0600/0400)
-- `certs/` — сертификат CA (`certs/ca.crt`)
-- `csr/` — CSR (опционально; скрипты сохраняют CSR в `csr/`)
-- `out/` — выданные leaf-серты/ключи/pfx
+- `CA/` — сертификат CA и приватный ключ
+  - `CA/ca.crt` — сертификат CA
+  - `CA/private/ca.key` — приватный ключ CA
 - `newcerts/` — хранилище выданных сертификатов OpenSSL CA
-- `crl/` — CRL (`crl/ca.crl.pem`)
+- `crl/` — CRL (`crl/crl.pem`)
+- `csr/` — CSR, сгенерированные скриптами
+- `out/` — выданные leaf-серты/ключи/pfx
 - `index.txt`, `serial`, `crlnumber`, `index.txt.attr` — файлы базы OpenSSL CA
 
 ## Настройка
 
-Отредактируйте `openssl.cnf` и задайте значения по умолчанию для DN в `[ req_distinguished_name ]`:
+Отредактируйте значения DN по умолчанию в `openssl.cnf` → `[ req_distinguished_name ]`:
 - `countryName_default`
 - `stateOrProvinceName_default`
 - `localityName_default`
-- `organizationName_default`
+- `0.organizationName_default`
 - `organizationalUnitName_default`
+- `emailAddress_default` (опционально)
 
 ### AIA / CDP
 
-AIA и CDP задаются **жёстко** в `openssl.cnf` в секциях `[ aia ]` и `[ crl_dp ]` (в начале файла).
+AIA и CDP задаются **жёстко** в `openssl.cnf` в `[ aia ]` и `[ crl_dp ]` (в начале файла).
 Строка OCSP оставлена **закомментированной**.
 
 ## Основные операции
 
-### Инициализация CA
-Один раз (создаёт каталоги и файлы БД):
+### Создание CA (один раз)
+
 ```bash
-./init-ca.sh
+./create_ca.sh
 ```
 
+Что делает:
+- Идемпотентно создаёт рабочие каталоги и файлы БД
+- Создаёт `CA/private/ca.key` и самоподписанный `CA/ca.crt` (запросит пароль)
+
 ### Выпуск server сертификата
+
 ```bash
 ./gen_server.sh app1 -san "DNS.1:app1.example.local,IP.1:10.0.0.10"
 ```
@@ -49,16 +56,17 @@ AIA и CDP задаются **жёстко** в `openssl.cnf` в секциях 
 - `DNS.1:<APP_NAME>.<dns_suffix>` (настраивается в `openssl.cnf`)
 
 ### Выпуск client сертификата (mTLS) + PFX
+
 ```bash
 ./gen_client.sh user1
 ```
 
 На выходе:
-- `out/user1.key` (приватный ключ)
-- `out/user1.crt` (клиентский сертификат)
-- `out/user1.pfx` (PKCS#12: сертификат + ключ + сертификат CA)
+- `out/user1.key` — приватный ключ
+- `out/user1.crt` — клиентский сертификат
+- `out/user1.pfx` — PKCS#12 (сертификат + ключ + сертификат CA)
 
-Пароль на экспорт PFX запрашивается один раз и равен паролю шифрования ключа, который используется при генерации ключа.
+Пароль на экспорт PFX запрашивается один раз и равен паролю шифрования ключа при генерации ключа.
 
 ### Отзыв и CRL
 
@@ -72,7 +80,7 @@ AIA и CDP задаются **жёстко** в `openssl.cnf` в секциях 
 ./gencrl.sh
 ```
 
-Проверка с учётом CRL:
+Проверка (CRL используется автоматически, если существует):
 ```bash
 ./verify.sh out/app1.crt
 ```
@@ -85,7 +93,7 @@ AIA и CDP задаются **жёстко** в `openssl.cnf` в секциях 
 ```
 
 Оповещение в Telegram:
-1) Скопируйте `notify.config.example` в `notify.config` и задайте значения (права 0600)
+1) Скопируйте `notify.config.example` → `notify.config` и задайте значения (права 0600)
 2) Запустите:
 ```bash
 ./expire-soon.sh 30 --notify
@@ -104,19 +112,19 @@ NOTIFY_CONFIG=/etc/openssl-ca/notify.config ./expire-soon.sh 30 --notify
 ## Справочник скриптов
 
 ### Выпуск
-- `create_server_csr.sh <name> [-san "..."]` — сгенерировать ключ + CSR (server)
-- `create_client_csr.sh <name> [-san "..."]` — сгенерировать ключ + CSR (client)
+- `create_server_csr.sh <name> [-san "..."]` — сгенерировать server ключ + CSR
+- `create_client_csr.sh <name> [-san "..."]` — сгенерировать client ключ + CSR
 - `sign_server_csr.sh <name>` — подписать server CSR
 - `sign_client_csr.sh <name>` — подписать client CSR
 - `gen_server.sh <name> [-san "..."]` — CSR + подпись (server)
 - `gen_client.sh <name> [-san "..."]` — CSR + подпись (client) + экспорт PFX
 
 ### Отзыв / CRL
-- `revoke.sh <cert.pem>` — отозвать сертификат и (опционально) обновить CRL
-- `gencrl.sh` — сгенерировать CRL
+- `revoke.sh <cert.pem>` — отозвать сертификат (обновляет БД CA)
+- `gencrl.sh` — сгенерировать CRL (`crl/crl.pem`)
 
 ### Проверка
-- `verify.sh <cert.pem>` — проверить сертификат по CA + CRL
+- `verify.sh <cert.pem>` — проверить сертификат по CA (и CRL, если есть)
 
 ### Вспомогательные скрипты CA DB
 - `status.sh <CN|serial>` — поиск в `index.txt` по CN/serial
@@ -124,9 +132,4 @@ NOTIFY_CONFIG=/etc/openssl-ca/notify.config ./expire-soon.sh 30 --notify
 - `list-revoked.sh` — список отозванных записей из `index.txt`
 
 ### Обслуживание
-- `clean.sh` — удаляет сгенерированные файлы (не удаляет ключ/сертификат CA)
-
-## Примечания
-- `create_*_csr.sh` автоматически формирует Subject из DN-defaults в `openssl.cnf` и задаёт `CN` равным переданному `<name>` (ввод CN не запрашивается интерактивно).
-
-- CDP поддерживает несколько CRL URL через `[ crl_dp ]` (`URI.0`, `URI.1`, ...).
+- `clean.sh [--db|--all]` — очистка output; опционально сброс DB / полный сброс

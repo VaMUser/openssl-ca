@@ -1,40 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-get_default() {
-  # Reads *_default values from openssl.cnf (simple parser)
-  # Usage: get_default "countryName_default"
-  local key="$1"
-  awk -F '=' -v k="$key" '
-    $1 ~ "^[[:space:]]*"k"[[:space:]]*$" {
-      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2);
-      print $2; exit
-    }' openssl.cnf
-}
-
-build_subj() {
-  local cn="$1"
-  local C ST L O OU EMAIL
-  C="$(get_default countryName_default || true)"
-  ST="$(get_default stateOrProvinceName_default || true)"
-  L="$(get_default localityName_default || true)"
-  # organizationName_default may be written as 0.organizationName_default
-  O="$(get_default 0.organizationName_default || true)"
-  [ -z "$O" ] && O="$(get_default organizationName_default || true)"
-  OU="$(get_default organizationalUnitName_default || true)"
-  EMAIL="$(get_default emailAddress_default || true)"
-
-  local subj=""
-  [ -n "$C" ] && subj="${subj}/C=${C}"
-  [ -n "$ST" ] && subj="${subj}/ST=${ST}"
-  [ -n "$L" ] && subj="${subj}/L=${L}"
-  [ -n "$O" ] && subj="${subj}/O=${O}"
-  [ -n "$OU" ] && subj="${subj}/OU=${OU}"
-  subj="${subj}/CN=${cn}"
-  [ -n "$EMAIL" ] && subj="${subj}/emailAddress=${EMAIL}"
-  echo "$subj"
-}
-
 umask 077
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,6 +7,7 @@ cd "$DIR"
 source ./lib.sh
 
 # Create CSR + private key for a mTLS client certificate.
+
 # Usage: create_client_csr.sh <NAME> [-san "DNS.1:alice.local,email.1:alice@example.com"]
 # Default SAN if omitted: DNS:<NAME>.<dns_suffix>
 # Default: encrypted key. Set ENCRYPT_KEY=0 for unencrypted key.
@@ -50,23 +16,14 @@ source ./lib.sh
 APP_NAME="$1"; shift
 validate_name "$APP_NAME"
 
-SAN_ARG=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -san|-san:*)
-      if [[ "$1" == -san:* ]]; then SAN_ARG="${1#-san:}"; shift;
-      else shift; SAN_ARG="${1:-}"; shift || true; fi
-      ;;
-    *) die "Unknown argument: $1" ;;
-  esac
-done
-
+SAN_ARG="$(parse_san_arg "$@")"
+DNS_SUFFIX="$(conf_get_or_default script_defaults dns_suffix local)"
 if [[ -z "$SAN_ARG" ]]; then
-  DNS_SUFFIX="$(awk 'BEGIN{sec=0} /^[[:space:]]*\[/{sec=0} /^[[:space:]]*\[script_defaults\][[:space:]]*$/ {sec=1; next} sec==1 {sub(/[;#].*$/, "", $0); if ($0 ~ /^[[:space:]]*dns_suffix[[:space:]]*=/) {sub(/.*=/,""); gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print; exit}}' ./openssl.cnf)"
-  [[ -n "$DNS_SUFFIX" ]] || DNS_SUFFIX="local"
   SAN_ARG="DNS.1:${APP_NAME}.${DNS_SUFFIX}"
 fi
 SAN="$(normalize_san "$SAN_ARG")"
+
+ensure_layout
 
 KEY="./out/${APP_NAME}.key"
 CSR="./out/${APP_NAME}.csr"
@@ -76,12 +33,13 @@ if [[ -f "$KEY" || -f "$CSR" ]]; then
   rm -f "$KEY" "$CSR"
 fi
 
+SUBJ="$(build_subj "$APP_NAME" 1)"
+
 KEYOPT="-aes256"
 PASS="${CLIENT_KEY_PASS:-}"
 if [[ "${ENCRYPT_KEY:-1}" == "0" ]]; then
   KEYOPT="-nodes"
 else
-  # Read passphrase once to avoid multiple prompts later (also used for PFX in gen_client.sh).
   if [[ -z "$PASS" ]]; then
     read -r -s -p "Enter passphrase for client private key: " PASS; echo
   fi
@@ -92,8 +50,8 @@ if [[ "$KEYOPT" == "-aes256" ]]; then
   openssl req \
     -config ./openssl.cnf \
     -new \
-  -subj "$(build_subj "$APP_NAME")" \
-  -addext "subjectAltName=${SAN}" \
+    -subj "$SUBJ" \
+    -addext "subjectAltName=${SAN}" \
     -newkey rsa:3072 -aes256 -passout pass:"$PASS" \
     -keyout "$KEY" \
     -out "$CSR" \
@@ -102,8 +60,8 @@ else
   openssl req \
     -config ./openssl.cnf \
     -new \
-  -subj "$(build_subj "$APP_NAME")" \
-  -addext "subjectAltName=${SAN}" \
+    -subj "$SUBJ" \
+    -addext "subjectAltName=${SAN}" \
     -newkey rsa:3072 -nodes \
     -keyout "$KEY" \
     -out "$CSR" \
