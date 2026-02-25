@@ -6,13 +6,43 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 source ./lib.sh
 
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") <APP_NAME> [-san "DNS.1:app.local,IP.1:10.0.0.1"]
+
+Create CSR + private key for a TLS server certificate.
+
+Options:
+  -san <SAN>   SubjectAltName entries. If omitted, defaults to:
+              DNS.1:<APP_NAME>.<dns_suffix>
+  -h, --help   Show this help and exit.
+
+Env:
+  ENCRYPT_KEY=1        Encrypt private key (default: 0 / unencrypted).
+  SERVER_KEY_PASS=...  Provide key passphrase via env (otherwise prompts).
+  FORCE=1              Overwrite existing output files.
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -lt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+
+
+
 # Create CSR + private key for a TLS server certificate.
 
 # Usage: create_server_csr.sh <APP_NAME> [-san "DNS.1:app.local,IP.1:10.0.0.1"]
 # Default SAN if omitted: DNS:<APP_NAME>.<dns_suffix>
 # Default: unencrypted key. Set ENCRYPT_KEY=1 to encrypt.
 
-[[ $# -ge 1 ]] || die "Usage: create_server_csr.sh <APP_NAME> [-san \"DNS.1:app.local,IP.1:10.0.0.1\"]"
 APP_NAME="$1"; shift
 validate_name "$APP_NAME"
 

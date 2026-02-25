@@ -6,13 +6,43 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 source ./lib.sh
 
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") <NAME> [-san "DNS.1:alice.local,email.1:alice@example.com"]
+
+Create CSR + private key for a mTLS client certificate.
+
+Options:
+  -san <SAN>   SubjectAltName entries. If omitted, defaults to:
+              DNS.1:<NAME>.<dns_suffix>
+  -h, --help   Show this help and exit.
+
+Env:
+  ENCRYPT_KEY=0        Generate unencrypted private key (default: encrypted).
+  CLIENT_KEY_PASS=...  Provide key passphrase via env (otherwise prompts).
+  FORCE=1              Overwrite existing output files.
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -lt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+
+
+
 # Create CSR + private key for a mTLS client certificate.
 
 # Usage: create_client_csr.sh <NAME> [-san "DNS.1:alice.local,email.1:alice@example.com"]
 # Default SAN if omitted: DNS:<NAME>.<dns_suffix>
 # Default: encrypted key. Set ENCRYPT_KEY=0 for unencrypted key.
 
-[[ $# -ge 1 ]] || die "Usage: create_client_csr.sh <NAME> [-san \"DNS.1:alice.local\"]"
 APP_NAME="$1"; shift
 validate_name "$APP_NAME"
 

@@ -19,6 +19,16 @@ Small, maintainable wrappers around `openssl ca` for a **single-tier** CA:
 - `out/` — issued leaf certs/keys/pfx
 - `index.txt`, `serial`, `crlnumber`, `index.txt.attr` — OpenSSL CA database files
 
+### Issued certificate files
+
+`openssl ca` writes issued certificates into `newcerts/` using the standard `SERIAL.pem` naming (via `-outdir`).
+
+For convenience, the signing scripts create symlinks in `out/` named:
+
+- `out/<SERIAL>_<CN>.crt` → `newcerts/<SERIAL>.pem`
+
+Symlinks are created idempotently by `ensure_recent_links` (it checks the **5 most recent** certificates in `newcerts/` and creates missing links).
+
 ## Configuration
 
 Edit DN defaults in `openssl.cnf` → `[ req_distinguished_name ]`:
@@ -63,7 +73,7 @@ If `-san` is omitted, a default SAN is used:
 
 Outputs:
 - `out/user1.key` — private key
-- `out/user1.crt` — client certificate
+- `out/<SERIAL>_user1.crt` — client certificate
 - `out/user1.pfx` — PKCS#12 (cert + key + CA cert)
 
 The PFX export password is prompted once and equals the key encryption password used during key generation.
@@ -72,7 +82,7 @@ The PFX export password is prompted once and equals the key encryption password 
 
 Revoke:
 ```bash
-./revoke.sh out/app1.crt
+./revoke.sh out/<SERIAL>_app1.crt
 ```
 
 Generate CRL:
@@ -82,7 +92,7 @@ Generate CRL:
 
 Verify with CRL check (auto-enables CRL if present):
 ```bash
-./verify.sh out/app1.crt
+./verify.sh out/<SERIAL>_app1.crt
 ```
 
 ## Monitoring: expiring certificates

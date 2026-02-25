@@ -146,3 +146,84 @@ ensure_layout() {
   [[ -f crlnumber ]] || echo "01" > crlnumber
   [[ -f index.txt.attr ]] || echo "unique_subject = no" > index.txt.attr
 }
+
+
+# ---------- index.txt helpers ----------
+
+# Portable awk program part: extract CN from OpenSSL "subject" field.
+# DN format: /C=RU/O=Org/CN=example
+awk_cn_helpers='
+function cn_from_subject(dn,   i,n,parts) {
+  n = split(dn, parts, "/")
+  for (i = 1; i <= n; i++) {
+    if (parts[i] ~ /^CN=/) {
+      sub(/^CN=/, "", parts[i])
+      return parts[i]
+    }
+  }
+  return ""
+}
+function is_hex_serial(s) {
+  return (s ~ /^[0-9A-Fa-f]+$/)
+}
+'
+
+# Run awk against index.txt with injected helper functions.
+# Usage:
+#   run_index_awk '<main awk code>' [query]
+run_index_awk() {
+  local main_awk="${1:?main awk required}"
+  local query="${2:-}"
+  awk -F $'\t' -v q="$query" "${awk_cn_helpers}
+${main_awk}" index.txt
+}
+# ---------- recent cert link helpers ----------
+
+sanitize_filename() {
+  # Keep only safe filename characters; replace the rest with "_".
+  echo "${1:-}" | sed -E 's/[^A-Za-z0-9._-]+/_/g'
+}
+
+cert_cn() {
+  # Extract CN from certificate subject. Best-effort; assumes CN does not contain unescaped commas.
+  local crt="${1:?cert path required}"
+  openssl x509 -in "$crt" -noout -subject -nameopt RFC2253     | sed -nE 's/^subject=//p'     | sed -nE 's/.*CN=([^,]+).*/\1/p'     | head -n1
+}
+
+ensure_recent_links() {
+  # ensure_recent_links <OUTDIR> <LINKDIR> [N=5]
+  # OUTDIR is where openssl ca -outdir writes SERIAL.pem
+  # LINKDIR will receive symlinks named: {SERIAL}_{CN}.crt
+  local outdir="${1:?outdir required}"
+  local linkdir="${2:?linkdir required}"
+  local n="${3:-5}"
+
+  mkdir -p "$outdir" "$linkdir"
+
+  # Pick N newest certs
+  mapfile -t certs < <(ls -1t "$outdir"/*.pem 2>/dev/null | head -n "$n" || true)
+  [[ "${#certs[@]}" -gt 0 ]] || return 0
+
+  local crt serial cn cn_s link tmp_link target_abs
+  for crt in "${certs[@]}"; do
+    [[ -f "$crt" ]] || continue
+    serial="$(basename "$crt" .pem)"
+    serial="${serial,,}"
+
+    cn="$(cert_cn "$crt" || true)"
+    [[ -n "$cn" ]] || continue
+    cn_s="$(sanitize_filename "$cn")"
+
+    link="$linkdir/${serial}_${cn_s}.crt"
+    if [[ -L "$link" || -e "$link" ]]; then
+      continue
+    fi
+
+    # Absolute target to avoid relative-path surprises.
+    target_abs="$(cd "$(dirname "$crt")" && pwd)/$(basename "$crt")"
+
+    tmp_link="${link}.tmp.$$"
+    ln -s "$target_abs" "$tmp_link"
+    mv -Tf "$tmp_link" "$link"
+  done
+}

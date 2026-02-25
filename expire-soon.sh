@@ -6,6 +6,39 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 source ./lib.sh
 
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") <days> [--notify] [--dry-run]
+
+List certificates expiring within <days> days.
+Optionally sends a Telegram notification.
+
+Options:
+  --notify     Send Telegram notification (requires notify.config / env vars).
+  --dry-run    Do not send notification (still prints output).
+  -h, --help   Show this help and exit.
+
+Config:
+  notify.config (or set NOTIFY_CONFIG=/path/to/notify.config)
+
+Requires:
+  GNU date, curl (for --notify).
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -lt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+
+
+
 # List certificates expiring within N days and optionally notify Telegram.
 
 # Requires GNU date and curl.
@@ -21,7 +54,6 @@ CONFIG_FILE="${NOTIFY_CONFIG:-./notify.config}"
 DO_NOTIFY=0
 DRY_RUN=0
 
-[[ $# -ge 1 ]] || die "Usage: $0 <days> [--notify] [--dry-run]"
 DAYS="$1"; shift
 
 while [[ $# -gt 0 ]]; do

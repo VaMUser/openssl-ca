@@ -6,47 +6,54 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 source ./lib.sh
 
-# Create a single-tier CA (self-signed CA certificate).
 
-# Usage: create_ca.sh [--cn "My CA"]
-# Prompts for CA key passphrase.
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [--cn "My CA"]
+
+Create a single-tier (self-signed) CA certificate and private key.
+
+Options:
+  --cn <CN>    Override CA Common Name (CN).
+  -h, --help   Show this help and exit.
+
+Notes:
+  You will be prompted for the CA key passphrase.
+EOF
+}
 
 CN_OVERRIDE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    -h|--help)
+      usage; exit 0 ;;
     --cn)
       shift; CN_OVERRIDE="${1:-}"; shift || true ;;
     --cn=*)
-      CN_OVERRIDE="${1#--cn=}"; shift ;;
-    -h|--help)
-      echo "Usage: $0 [--cn \"My CA\"]"
-      exit 0 ;;
+      CN_OVERRIDE="${1#*=}"; shift ;;
     *)
-      die "Unknown argument: $1" ;;
+      usage >&2; exit 2 ;;
   esac
 done
 
 ensure_layout
 
-if [[ -f CA/private/ca.key || -f CA/ca.crt ]]; then
-  [[ "${FORCE:-0}" == "1" ]] || die "CA already exists (CA/private/ca.key or CA/ca.crt). Set FORCE=1 to overwrite."
-  rm -f CA/private/ca.key CA/ca.crt
+CA_KEY="./CA/private/ca.key"
+CA_CRT="./CA/ca.crt"
+
+if [[ -f "$CA_KEY" || -f "$CA_CRT" ]]; then
+  [[ "${FORCE:-0}" == "1" ]] || die "CA already exists. Set FORCE=1 to overwrite."
+  rm -f "$CA_KEY" "$CA_CRT"
 fi
 
-CA_CN="${CN_OVERRIDE:-$(conf_get_or_default script_defaults ca_common_name "Local CA")}"
-SUBJ="$(build_subj "$CA_CN" 0)"
+CN="${CN_OVERRIDE:-$(conf_get_or_default ca cn "Local CA")}"
 
-openssl req \
-  -config ./openssl.cnf \
-  -new -x509 \
-  -days 3650 \
-  -extensions v3_ca \
-  -subj "$SUBJ" \
-  -keyout CA/private/ca.key \
-  -out CA/ca.crt
+openssl req -new -x509 -days 3650 -newkey rsa:4096 \
+  -keyout "$CA_KEY" -out "$CA_CRT" \
+  -subj "/CN=${CN}" \
+  -sha256
 
-chmod 0600 CA/private/ca.key
-chmod 0644 CA/ca.crt
-echo "CA created:"
-echo "  Key:  CA/private/ca.key"
-echo "  Cert: CA/ca.crt"
+chmod 600 "$CA_KEY"
+chmod 644 "$CA_CRT"
+
+echo "OK: $CA_CRT"

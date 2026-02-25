@@ -6,22 +6,39 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 source ./lib.sh
 
-# Clean generated artifacts (safe by default).
 
-# Usage:
-#   clean.sh           # remove out/* and csr/* only
-#   clean.sh --db      # also reset CA DB (index/serial/newcerts/crl) but keep CA key/cert
-#   clean.sh --all     # remove EVERYTHING including CA key/cert
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [--db|--all]
+
+Clean generated artifacts.
+
+Modes:
+  (default)   Remove ./out/* and ./csr/*
+  --db        Also reset CA database (index/serial/newcerts/crl), keep CA key/cert
+  --all       Remove everything including CA key/cert
+
+Options:
+  -h, --help  Show this help and exit.
+EOF
+}
 
 MODE="out"
-if [[ $# -gt 0 ]]; then
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -gt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+if [[ $# -eq 1 ]]; then
   case "$1" in
     --db) MODE="db" ;;
     --all) MODE="all" ;;
-    -h|--help)
-      echo "Usage: $0 [--db|--all]"
-      exit 0 ;;
-    *) die "Unknown argument: $1" ;;
+    *) usage >&2; exit 2 ;;
   esac
 fi
 

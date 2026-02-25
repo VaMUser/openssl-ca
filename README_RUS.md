@@ -19,6 +19,16 @@
 - `out/` — выданные leaf-серты/ключи/pfx
 - `index.txt`, `serial`, `crlnumber`, `index.txt.attr` — файлы базы OpenSSL CA
 
+### Файлы выданных сертификатов
+
+`openssl ca` складывает выданные сертификаты в `newcerts/` в стандартном формате `SERIAL.pem` (через `-outdir`).
+
+Для удобства скрипты подписи создают симлинки в `out/`:
+
+- `out/<SERIAL>_<CN>.crt` → `newcerts/<SERIAL>.pem`
+
+Симлинки создаются идемпотентно функцией `ensure_recent_links` (проверяются **5 последних** сертификатов в `newcerts/` и создаются отсутствующие ссылки).
+
 ## Настройка
 
 Отредактируйте значения DN по умолчанию в `openssl.cnf` → `[ req_distinguished_name ]`:
@@ -63,7 +73,7 @@ AIA и CDP задаются **жёстко** в `openssl.cnf` в `[ aia ]` и `[
 
 На выходе:
 - `out/user1.key` — приватный ключ
-- `out/user1.crt` — клиентский сертификат
+- `out/<SERIAL>_user1.crt` — клиентский сертификат
 - `out/user1.pfx` — PKCS#12 (сертификат + ключ + сертификат CA)
 
 Пароль на экспорт PFX запрашивается один раз и равен паролю шифрования ключа при генерации ключа.
@@ -72,7 +82,7 @@ AIA и CDP задаются **жёстко** в `openssl.cnf` в `[ aia ]` и `[
 
 Отзыв:
 ```bash
-./revoke.sh out/app1.crt
+./revoke.sh out/<SERIAL>_app1.crt
 ```
 
 Генерация CRL:
@@ -82,7 +92,7 @@ AIA и CDP задаются **жёстко** в `openssl.cnf` в `[ aia ]` и `[
 
 Проверка (CRL используется автоматически, если существует):
 ```bash
-./verify.sh out/app1.crt
+./verify.sh out/<SERIAL>_app1.crt
 ```
 
 ## Мониторинг истечения сертификатов
