@@ -42,8 +42,26 @@ fi
 QUERY="${1:-}"
 
 run_index_awk '
-BEGIN{ ql = tolower(q) }
+function fmt_time(s,   yy,y,mm,dd,HH,MM,SS) {
+  if (s == "" || s == "-") return "-"
+  yy = substr(s,1,2) + 0
+  y  = (yy < 50) ? (2000 + yy) : (1900 + yy)
+  mm = substr(s,3,2) + 0
+  dd = substr(s,5,2) + 0
+  HH = substr(s,7,2) + 0
+  MM = substr(s,9,2) + 0
+  SS = substr(s,11,2) + 0
+  return sprintf("%04d-%02d-%02d %02d:%02d:%02dZ", y, mm, dd, HH, MM, SS)
+}
+BEGIN{
+  ql = tolower(q)
+  printf "%-7s %-8s %-20s %-20s %-30s %s\n", "STATUS", "SERIAL", "EXPIRES(UTC)", "REVOKED(UTC)", "CN", "FILE"
+}
 $1=="V"{
+  status = $1
+  expiry = $2
+  revoked = $3
+  serial = $4
   file = $5
   dn   = $6
   cn   = cn_from_subject(dn)
@@ -52,7 +70,7 @@ $1=="V"{
       index(tolower(cn), ql) ||
       index(tolower(file), ql) ||
       index(tolower(dn), ql)) {
-    print
+    printf "%-7s %-8s %-20s %-20s %-30s %s\n", "VALID", tolower(serial), fmt_time(expiry), fmt_time(revoked), cn, file
   }
 }
 ' "$QUERY"
